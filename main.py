@@ -40,7 +40,7 @@ def generate_record(tag_id, timestamp):
     return full.lower()
 
 class IpicoEditor:
-    def _init_(self, root):
+    def __init__(self, root):
         self.root = root
         self.root.title("Ipico Tijdregistratie Editor")
 
@@ -218,7 +218,7 @@ class IpicoEditor:
             messagebox.showerror("Fout", f"Kon niet opslaan:\n{e}")
 
 # Start GUI
-if _name_ == "_main_":
+if __name__ == "__main__":
     root = tk.Tk()
     app = IpicoEditor(root)
     root.mainloop()
