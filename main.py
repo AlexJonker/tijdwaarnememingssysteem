@@ -144,9 +144,15 @@ class IpicoEditor:
 
     def update_tag_list(self):
         self.tag_listbox.delete(0, tk.END)
-        for tag_id in sorted(self.data.keys()):
-            startnummer = self.tagmap.get(tag_id, "?")
-            self.tag_listbox.insert(tk.END, f"{startnummer} ({tag_id})")
+        tag_tuples = []
+        for tag_id in self.data.keys():
+            startnummer = self.tagmap.get(tag_id)
+            tag_tuples.append((startnummer if startnummer is not None else float('inf'), tag_id))
+
+        tag_tuples.sort()
+        for startnummer, tag_id in tag_tuples:
+            display_num = "?" if startnummer == float('inf') else startnummer
+            self.tag_listbox.insert(tk.END, f"{display_num} ({tag_id})")
 
     def update_time_list(self, event=None):
         self.time_listbox.delete(0, tk.END)
