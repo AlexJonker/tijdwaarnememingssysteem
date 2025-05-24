@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import datetime
-import os
 import shutil
 
 def parse_record(line):
@@ -72,6 +71,9 @@ class IpicoEditor:
 
         self.time_listbox = tk.Listbox(frame, width=50)
         self.time_listbox.grid(row=1, column=1, sticky="ns")
+        self.time_listbox.bind('<Double-Button-1>', self.edit_time)
+
+        
 
         button_frame = tk.Frame(frame)
         button_frame.grid(row=2, column=1, pady=5)
@@ -203,6 +205,36 @@ class IpicoEditor:
             self.original_lines.append(new_line + "\n")
         except Exception as e:
             messagebox.showerror("Fout", f"Kan tijd niet toevoegen:\n{e}")
+
+    def edit_time(self, event):
+        idx = self.time_listbox.curselection()
+        if not self.current_selected_tag or not idx:
+            return
+        old_time = self.data[self.current_selected_tag][idx[0]]
+        input_str = simpledialog.askstring(
+            "Bewerk tijd",
+            "Pas tijd aan als 'YYYY-MM-DD HH:MM:SS.ms'",
+            initialvalue=old_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        )
+        if not input_str:
+            return
+        try:
+            new_time = datetime.datetime.strptime(input_str, "%Y-%m-%d %H:%M:%S.%f")
+            # Update in-memory data
+            self.data[self.current_selected_tag][idx[0]] = new_time
+            self.data[self.current_selected_tag].sort()
+            self.update_time_list()
+
+            # Update in file: remove old, add new
+            formatted_old = generate_record(self.current_selected_tag, old_time)
+            self.original_lines = [line for line in self.original_lines if not line.lower().startswith(formatted_old)]
+            formatted_new = generate_record(self.current_selected_tag, new_time)
+            self.original_lines.append(formatted_new + "\n")
+            with open(self.reader_filepath, "w") as f:
+                f.writelines(self.original_lines)
+        except Exception as e:
+            messagebox.showerror("Fout", f"Kan tijd niet aanpassen:\n{e}")
+
 
     def save_file(self):
         if not self.gunshot_time:
