@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 import datetime
 import shutil
+import os
 
 def parse_record(line):
     line = line.strip()
@@ -92,8 +93,19 @@ class IpicoEditor:
             return
         self.reader_filepath = filepath
 
-        # Backup maken
-        backup_path = filepath.replace(".txt", "_backup.txt")
+        backup_dir = os.path.join(os.path.dirname(filepath), "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        base_filename = os.path.basename(filepath).replace(".txt", "_backup.txt")
+        base_backup_path = os.path.join(backup_dir, base_filename)
+        backup_path = base_backup_path
+        count = 1
+        while os.path.exists(backup_path):
+            backup_path = os.path.join(
+                backup_dir,
+                os.path.basename(filepath).replace(".txt", f"_backup{count}.txt")
+            )
+            count += 1
         shutil.copy(filepath, backup_path)
 
         self.data.clear()
@@ -114,6 +126,7 @@ class IpicoEditor:
             messagebox.showinfo("Gelukt", f"Readerdata geladen. Backup gemaakt als:\n{backup_path}")
         except Exception as e:
             messagebox.showerror("Fout", f"Kon bestand niet laden:\n{e}")
+
 
     def load_tagmap(self):
         filepath = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
@@ -206,7 +219,7 @@ class IpicoEditor:
         except Exception as e:
             messagebox.showerror("Fout", f"Kan tijd niet toevoegen:\n{e}")
 
-    def edit_time(self, event):
+    def edit_time(self, _):
         idx = self.time_listbox.curselection()
         if not self.current_selected_tag or not idx:
             return
@@ -220,16 +233,18 @@ class IpicoEditor:
             return
         try:
             new_time = datetime.datetime.strptime(input_str, "%Y-%m-%d %H:%M:%S.%f")
-            # Update in-memory data
+
             self.data[self.current_selected_tag][idx[0]] = new_time
             self.data[self.current_selected_tag].sort()
             self.update_time_list()
 
-            # Update in file: remove old, add new
+
             formatted_old = generate_record(self.current_selected_tag, old_time)
             self.original_lines = [line for line in self.original_lines if not line.lower().startswith(formatted_old)]
             formatted_new = generate_record(self.current_selected_tag, new_time)
             self.original_lines.append(formatted_new + "\n")
+
+            self.original_lines.sort()
             with open(self.reader_filepath, "w") as f:
                 f.writelines(self.original_lines)
         except Exception as e:
