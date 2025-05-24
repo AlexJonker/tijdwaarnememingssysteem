@@ -5,17 +5,17 @@ import shutil
 import os
 
 def parse_record(line):
-    line = line.strip()
-    if not line.startswith("aa0"):
+    line = line.strip().lower()
+    if not line.startswith("aa01"):
         return None, None
     if len(line) < 36:
         return None, None
-    tag_id = line[4:16].lower()
+    tag_id = line[4:16]  # Corrected: tag_id is at positions 4-15 (12 chars)
     if not tag_id.startswith("058") or len(tag_id) != 12:
         return None, None
     date_str = line[20:26]
-    time_str = line[26:34]
-    hundredths_hex = line[34:36]
+    time_str = line[26:32]
+    hundredths_hex = line[32:34]
     try:
         year = int(date_str[0:2]) + 2000
         month = int(date_str[2:4])
@@ -26,7 +26,7 @@ def parse_record(line):
         hundredths = int(hundredths_hex, 16)
         timestamp = datetime.datetime(year, month, day, hour, minute, second, hundredths * 10000)
         return tag_id, timestamp
-    except:
+    except Exception:
         return None, None
 
 def generate_record(tag_id, timestamp):
@@ -42,17 +42,21 @@ def generate_record(tag_id, timestamp):
 class IpicoEditor:
     def __init__(self, root):
         self.root = root
-        self.root.title("Ipico Tijdregistratie Editor")
-
+        self.root.title("Ipico Editor")
+        
+        # Initialize all data structures first
         self.data = {}
         self.tagmap = {}
         self.reverse_tagmap = {}
+        self.original_lines = []
         self.gunshot_time = None
         self.current_selected_tag = None
         self.reader_filepath = None
-        self.original_lines = []
-
+        
+        # Build UI after initialization
         self.build_ui()
+        
+        # Pre-load any default files here if needed
 
     def build_ui(self):
         frame = tk.Frame(self.root)
@@ -66,13 +70,11 @@ class IpicoEditor:
         tk.Button(top_buttons, text="Stel Gunshot-tijd in", command=self.set_gunshot_time).pack(side="left", padx=2)
         tk.Button(top_buttons, text="Opslaan als CSV", command=self.save_file).pack(side="left", padx=2)
 
-        # Make the frame expand to use the entire screen
         self.root.update_idletasks()
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         self.root.geometry(f"{screen_width}x{screen_height}")
 
-        # Make the main frame expand to fill the window
         self.root.rowconfigure(0, weight=1)
         self.root.columnconfigure(0, weight=1)
         frame.grid(row=0, column=0, sticky="nsew")
@@ -80,7 +82,6 @@ class IpicoEditor:
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_columnconfigure(1, weight=2)
 
-        # Listboxes expand vertically and horizontally
         self.tag_listbox = tk.Listbox(frame, width=35, exportselection=False)
         self.tag_listbox.grid(row=1, column=0, sticky="nsew")
         self.tag_listbox.bind('<<ListboxSelect>>', self.update_time_list)
@@ -147,22 +148,30 @@ class IpicoEditor:
         filepath = filedialog.askopenfilename(filetypes=[("Text files", "*.txt")])
         if not filepath:
             return
+
         try:
             with open(filepath, "r") as f:
-                lines = f.readlines()[1:]
-                self.tagmap.clear()
-                self.reverse_tagmap.clear()
-                for line in lines:
-                    if "," in line:
+                lines = f.readlines()[1:]  # Skip header
+
+            self.tagmap.clear()
+            self.reverse_tagmap.clear()
+
+            for line in lines:
+                if "," in line:
+                    try:
                         startnummer, tag_id = line.strip().split(",", 1)
                         startnummer = int(startnummer)
-                        tag_id = tag_id.strip().lower()
+                        tag_id = tag_id.strip().lower()  # Normalize to lowercase
                         self.tagmap[tag_id] = startnummer
                         self.reverse_tagmap[startnummer] = tag_id
-            messagebox.showinfo("Succes", "Tagmap succesvol geladen.")
-            self.update_tag_list()
+                    except ValueError:
+                        continue
+
+            messagebox.showinfo("Success", f"Loaded {len(self.tagmap)} tag mappings")
+            self.update_tag_list()  # Refresh display immediately
+
         except Exception as e:
-            messagebox.showerror("Fout", f"Tagmap laden mislukt:\n{e}")
+            messagebox.showerror("Error", f"Failed loading TagMap:\n{e}")
 
     def set_gunshot_time(self):
         input_str = simpledialog.askstring("Gunshot tijd", "Voer gunshot tijd in als 'YYYY-MM-DD HH:MM:SS'")
@@ -234,14 +243,14 @@ class IpicoEditor:
         except Exception as e:
             messagebox.showerror("Fout", f"Kan tijd niet toevoegen:\n{e}")
 
-    def edit_time(self, _):
+    def edit_time(self, event=None):
         idx = self.time_listbox.curselection()
         if not self.current_selected_tag or not idx:
             return
         old_time = self.data[self.current_selected_tag][idx[0]]
         input_str = simpledialog.askstring(
             "Bewerk tijd",
-            "Pas tijd aan als 'YYYY-MM-DD HH:MM:SS.ms'",
+            "Voer nieuwe tijd in als 'YYYY-MM-DD HH:MM:SS.ms'",
             initialvalue=old_time.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         )
         if not input_str:
@@ -253,17 +262,20 @@ class IpicoEditor:
             self.data[self.current_selected_tag].sort()
             self.update_time_list()
 
+            old_line = generate_record(self.current_selected_tag, old_time)
+            new_line = generate_record(self.current_selected_tag, new_time)
 
-            formatted_old = generate_record(self.current_selected_tag, old_time)
-            self.original_lines = [line for line in self.original_lines if not line.lower().startswith(formatted_old)]
-            formatted_new = generate_record(self.current_selected_tag, new_time)
-            self.original_lines.append(formatted_new + "\n")
+            for i, line in enumerate(self.original_lines):
+                if line.lower().startswith(old_line):
+                    self.original_lines[i] = new_line + "\n"
+                    break
 
-            self.original_lines.sort()
             with open(self.reader_filepath, "w") as f:
                 f.writelines(self.original_lines)
         except Exception as e:
-            messagebox.showerror("Fout", f"Kan tijd niet aanpassen:\n{e}")
+            messagebox.showerror("Fout", f"Kan tijd niet bewerken:\n{e}")
+
+    
 
 
     def save_file(self):
