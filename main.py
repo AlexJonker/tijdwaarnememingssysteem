@@ -66,12 +66,27 @@ class IpicoEditor:
         tk.Button(top_buttons, text="Stel Gunshot-tijd in", command=self.set_gunshot_time).pack(side="left", padx=2)
         tk.Button(top_buttons, text="Opslaan als CSV", command=self.save_file).pack(side="left", padx=2)
 
+        # Make the frame expand to use the entire screen
+        self.root.update_idletasks()
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        self.root.geometry(f"{screen_width}x{screen_height}")
+
+        # Make the main frame expand to fill the window
+        self.root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
+        frame.grid(row=0, column=0, sticky="nsew")
+        frame.grid_rowconfigure(1, weight=1)
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(1, weight=2)
+
+        # Listboxes expand vertically and horizontally
         self.tag_listbox = tk.Listbox(frame, width=35, exportselection=False)
-        self.tag_listbox.grid(row=1, column=0, sticky="ns")
+        self.tag_listbox.grid(row=1, column=0, sticky="nsew")
         self.tag_listbox.bind('<<ListboxSelect>>', self.update_time_list)
 
-        self.time_listbox = tk.Listbox(frame, width=50)
-        self.time_listbox.grid(row=1, column=1, sticky="ns")
+        self.time_listbox = tk.Listbox(frame, width=80)
+        self.time_listbox.grid(row=1, column=1, sticky="nsew")
         self.time_listbox.bind('<Double-Button-1>', self.edit_time)
 
         
